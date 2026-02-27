@@ -116,7 +116,8 @@ h1 .dot {
     gap: 0.8rem;
     margin: 0.6rem 0;
 }
-.color-row label { min-width: 80px; color: var(--dim); font-size: 0.9rem; }
+.color-row label { min-width: 80px; color: var(--dim); font-size: 0.9rem; display: flex; align-items: center; gap: 0.3rem; }
+.color-row label input[type=checkbox] { accent-color: var(--accent); }
 input[type=color] {
     width: 48px; height: 32px;
     border: 1px solid var(--border);
@@ -293,31 +294,55 @@ select {
         <span class="zone-chip" data-zone="logo" onclick="toggleZone(this)">Logo</span>
     </div>
 
-    <div class="color-row">
-        <label>Color 1</label>
-        <input type="color" id="color1" value="#ffffff">
-        <div class="color-swatches">
-            <div class="swatch" style="background:#fff" onclick="setColor('color1','#ffffff')"></div>
-            <div class="swatch" style="background:#ff0000" onclick="setColor('color1','#ff0000')"></div>
-            <div class="swatch" style="background:#00ff00" onclick="setColor('color1','#00ff00')"></div>
-            <div class="swatch" style="background:#0088ff" onclick="setColor('color1','#0088ff')"></div>
-            <div class="swatch" style="background:#ff8800" onclick="setColor('color1','#ff8800')"></div>
-            <div class="swatch" style="background:#ff00ff" onclick="setColor('color1','#ff00ff')"></div>
-            <div class="swatch" style="background:#00ffff" onclick="setColor('color1','#00ffff')"></div>
-            <div class="swatch" style="background:#8800ff" onclick="setColor('color1','#8800ff')"></div>
+    <div id="color-controls">
+        <div class="color-row" id="color1-row">
+            <label>Color 1</label>
+            <input type="color" id="color1" value="#ffffff">
+            <div class="color-swatches">
+                <div class="swatch" style="background:#fff" onclick="setColor('color1','#ffffff')"></div>
+                <div class="swatch" style="background:#ff0000" onclick="setColor('color1','#ff0000')"></div>
+                <div class="swatch" style="background:#00ff00" onclick="setColor('color1','#00ff00')"></div>
+                <div class="swatch" style="background:#0088ff" onclick="setColor('color1','#0088ff')"></div>
+                <div class="swatch" style="background:#ff8800" onclick="setColor('color1','#ff8800')"></div>
+                <div class="swatch" style="background:#ff00ff" onclick="setColor('color1','#ff00ff')"></div>
+                <div class="swatch" style="background:#00ffff" onclick="setColor('color1','#00ffff')"></div>
+                <div class="swatch" style="background:#8800ff" onclick="setColor('color1','#8800ff')"></div>
+            </div>
         </div>
-    </div>
-    <div class="color-row">
-        <label>Color 2</label>
-        <input type="color" id="color2" value="#000000">
-        <div class="color-swatches">
-            <div class="swatch" style="background:#000;border-color:#555" onclick="setColor('color2','#000000')"></div>
-            <div class="swatch" style="background:#ff0000" onclick="setColor('color2','#ff0000')"></div>
-            <div class="swatch" style="background:#0088ff" onclick="setColor('color2','#0088ff')"></div>
-            <div class="swatch" style="background:#ff8800" onclick="setColor('color2','#ff8800')"></div>
-            <div class="swatch" style="background:#ff00ff" onclick="setColor('color2','#ff00ff')"></div>
-            <div class="swatch" style="background:#00ffff" onclick="setColor('color2','#00ffff')"></div>
+        <div class="color-row extra-color" id="color2-row" style="display:none;">
+            <label><input type="checkbox" id="color2-on" onchange="onColorToggle()"> Color 2</label>
+            <input type="color" id="color2" value="#0088ff" disabled>
+            <div class="color-swatches">
+                <div class="swatch" style="background:#ff0000" onclick="setColor('color2','#ff0000')"></div>
+                <div class="swatch" style="background:#0088ff" onclick="setColor('color2','#0088ff')"></div>
+                <div class="swatch" style="background:#ff8800" onclick="setColor('color2','#ff8800')"></div>
+                <div class="swatch" style="background:#ff00ff" onclick="setColor('color2','#ff00ff')"></div>
+                <div class="swatch" style="background:#00ffff" onclick="setColor('color2','#00ffff')"></div>
+            </div>
         </div>
+        <div class="color-row extra-color" id="color3-row" style="display:none;">
+            <label><input type="checkbox" id="color3-on" onchange="onColorToggle()"> Color 3</label>
+            <input type="color" id="color3" value="#ff00ff" disabled>
+            <div class="color-swatches">
+                <div class="swatch" style="background:#ff0000" onclick="setColor('color3','#ff0000')"></div>
+                <div class="swatch" style="background:#00ff00" onclick="setColor('color3','#00ff00')"></div>
+                <div class="swatch" style="background:#0088ff" onclick="setColor('color3','#0088ff')"></div>
+                <div class="swatch" style="background:#ff8800" onclick="setColor('color3','#ff8800')"></div>
+                <div class="swatch" style="background:#00ffff" onclick="setColor('color3','#00ffff')"></div>
+            </div>
+        </div>
+        <div class="color-row extra-color" id="color4-row" style="display:none;">
+            <label><input type="checkbox" id="color4-on" onchange="onColorToggle()"> Color 4</label>
+            <input type="color" id="color4" value="#00ffff" disabled>
+            <div class="color-swatches">
+                <div class="swatch" style="background:#ff0000" onclick="setColor('color4','#ff0000')"></div>
+                <div class="swatch" style="background:#00ff00" onclick="setColor('color4','#00ff00')"></div>
+                <div class="swatch" style="background:#ff8800" onclick="setColor('color4','#ff8800')"></div>
+                <div class="swatch" style="background:#ff00ff" onclick="setColor('color4','#ff00ff')"></div>
+                <div class="swatch" style="background:#8800ff" onclick="setColor('color4','#8800ff')"></div>
+            </div>
+        </div>
+        <p id="color-hint" style="color:var(--dim);font-size:0.75rem;margin-top:0.3rem;"></p>
     </div>
 
     <div class="slider-row">
@@ -470,6 +495,8 @@ function toggleLogo() {
 
 function setColor(id, hex) {
     document.getElementById(id).value = hex;
+    const cb = document.getElementById(id + '-on');
+    if (cb && !cb.checked) { cb.checked = true; onColorToggle(); }
 }
 
 function toggleZone(el) {
@@ -480,23 +507,74 @@ function getSelectedZones() {
     return [...document.querySelectorAll('.zone-chip.selected')].map(e => e.dataset.zone);
 }
 
+// Effect categories
+const EFFECTS_NO_COLOR = ['rainbow-wave', 'screw-rainbow', 'smooth'];
+const EFFECTS_MULTI_COLOR = ['color-change', 'color-pulse', 'color-wave'];
+
+function onEffectChange() {
+    const effect = document.getElementById('effect-select').value;
+    const noColor = EFFECTS_NO_COLOR.includes(effect);
+    const multiColor = EFFECTS_MULTI_COLOR.includes(effect);
+    const hint = document.getElementById('color-hint');
+
+    // Color 1: always visible unless no-color effect
+    document.getElementById('color1-row').style.display = noColor ? 'none' : '';
+
+    // Extra colors: only show rows for multi-color effects
+    document.querySelectorAll('.extra-color').forEach(el => {
+        el.style.display = multiColor ? '' : 'none';
+    });
+
+    if (noColor) {
+        hint.textContent = 'This effect uses built-in colors (no color selection needed).';
+    } else if (multiColor) {
+        hint.textContent = 'Enable extra colors to cycle/pulse/wave between them.';
+    } else {
+        hint.textContent = '';
+    }
+}
+
+function onColorToggle() {
+    for (let i = 2; i <= 4; i++) {
+        const cb = document.getElementById('color' + i + '-on');
+        const picker = document.getElementById('color' + i);
+        if (cb && picker) picker.disabled = !cb.checked;
+    }
+}
+
+document.getElementById('effect-select').addEventListener('change', onEffectChange);
+onEffectChange();
+
 async function applyCustom() {
     const effect = document.getElementById('effect-select').value;
     const zones = getSelectedZones();
-    const c1 = document.getElementById('color1').value;
-    const c2 = document.getElementById('color2').value;
     const speed = document.getElementById('speed-slider').value;
 
     if (!zones.length) { toast('Select at least one zone', false); return; }
 
-    // Build multi command for selected zones with effect, unselected zones get off
+    // Collect enabled colors
+    const noColor = EFFECTS_NO_COLOR.includes(effect);
+    let colorList = [];
+    if (!noColor) {
+        colorList.push(document.getElementById('color1').value);
+        for (let i = 2; i <= 4; i++) {
+            const cb = document.getElementById('color' + i + '-on');
+            if (cb && cb.checked) {
+                colorList.push(document.getElementById('color' + i).value);
+            }
+        }
+    }
+    const colorStr = colorList.join(',');
+
     const allZones = ['keyboard', 'perimeter', 'logo'];
     const parts = [];
     for (const z of allZones) {
         if (zones.includes(z)) {
-            let colors = c1;
-            if (c2 !== '#000000') colors += ',' + c2;
-            parts.push(z + ':' + effect + ':' + colors + ':' + speed);
+            if (colorStr) {
+                parts.push(z + ':' + effect + ':' + colorStr + ':' + speed);
+            } else {
+                parts.push(z + ':' + effect + '::' + speed);
+            }
         } else {
             parts.push(z + ':static:off');
         }
