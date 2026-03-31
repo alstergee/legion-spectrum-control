@@ -571,8 +571,9 @@ select {
             <label style="color:var(--dim);font-size:0.85rem;display:block;margin-bottom:0.4rem;">Paint Color</label>
             <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.6rem;">
                 <input type="color" id="paint-color" value="#ff0000">
-                <button class="btn" onclick="kbFill()" style="font-size:0.75rem;padding:0.4rem 0.6rem;">Fill</button>
-                <button class="btn" onclick="kbClear()" style="font-size:0.75rem;padding:0.4rem 0.6rem;">Clear</button>
+                <button class="btn" onclick="selectAll()" style="font-size:0.75rem;padding:0.4rem 0.6rem;">Select All</button>
+                <button class="btn" onclick="clearSelection()" style="font-size:0.75rem;padding:0.4rem 0.6rem;border-color:var(--accent);color:var(--accent);">Clear Sel</button>
+                <button class="btn" onclick="kbClear()" style="font-size:0.75rem;padding:0.4rem 0.6rem;">Reset All</button>
                 <button class="btn" onclick="kbEraser()" id="eraser-btn" style="font-size:0.75rem;padding:0.4rem 0.6rem;">Eraser</button>
             </div>
             <div class="color-swatches" style="margin-bottom:0.4rem;">
@@ -656,7 +657,8 @@ select {
                 <span style="color:var(--dim);font-size:0.7rem;">Hold Shift / Ctrl / Alt to preview context keys on hardware</span>
             </div>
 
-            <button class="apply-btn" onclick="applyKeyboard()">Apply Per-Key Layout</button>
+            <button class="btn" onclick="applyColorToSelection()" style="width:100%;margin-bottom:0.4rem;padding:0.6rem;border-color:#4caf50;color:#4caf50;font-weight:600;">Apply Color to Selection</button>
+            <button class="apply-btn" onclick="applyKeyboard()">Send All to Hardware</button>
             <button class="btn" style="width:100%;margin-top:0.5rem;border-color:#ff8800;font-size:0.72rem;" onclick="startCalibration()">Calibrate Keys</button>
             <div id="cal-info" style="display:none;margin-top:0.5rem;font-size:0.7rem;color:var(--dim);">
                 <span id="cal-idx">-</span>/101 — Code: <span id="cal-code">-</span><br>
@@ -1052,9 +1054,11 @@ const PERIM_FRONT = [0x01f5,0x01f6,0x01f7,0x01f8,0x01f9,0x01fa,0x01fb,0x01fc,0x0
 const KEY_U = K;
 const KEY_GAP = G;
 const KEY_H = KH;
-let keyColors = {}; // keycode -> hex color (locked/painted keys)
+let selectedKeys = new Set();   // currently selected keycodes (pending assignment)
+let appliedGroups = [];         // [{effect, speed, colors, keys:[codes]}] — applied to hardware
+let keyColors = {};             // keycode -> hex color (for visual state tracking)
 let eraserMode = false;
-let livePreview = true; // hardware reacts to mouse
+let livePreview = true;
 
 // Throttled preview — max one HID write per 150ms
 let _previewTimer = null;
@@ -1112,9 +1116,9 @@ function makeKeyEl(label, code, w) {
     key.classList.add('kb-key');
     if (keyColors[code]) applyKeyColor(key, keyColors[code]);
 
-    key.addEventListener('mousedown', (e) => { e.preventDefault(); paintKey(key); });
+    key.addEventListener('mousedown', (e) => { e.preventDefault(); toggleSelect(key); });
     key.addEventListener('mouseenter', (e) => {
-        if (e.buttons === 1) { paintKey(key); }
+        if (e.buttons === 1) { toggleSelect(key); }
         else if (livePreview) {
             const c = eraserMode ? '#000000' : document.getElementById('paint-color').value;
             previewHW(buildFullHWState(parseInt(key.dataset.code), c));
@@ -1206,23 +1210,27 @@ function buildKeyboard() {
     kb.appendChild(frontStrip);
 }
 
-function paintKey(keyEl) {
+function toggleSelect(keyEl) {
     const code = parseInt(keyEl.dataset.code);
-    const color = document.getElementById('paint-color').value;
-    if (eraserMode || keyColors[code] === color) {
-        // Toggle off: if already this color (or eraser mode), remove it
+    if (eraserMode) {
+        // Eraser: remove from applied groups and clear visual
+        selectedKeys.delete(code);
+        appliedGroups = appliedGroups.map(g => ({...g, keys: g.keys.filter(k => k !== code)})).filter(g => g.keys.length > 0);
         delete keyColors[code];
         keyEl.style.background = '#181818';
         keyEl.style.borderColor = '#333';
         keyEl.style.boxShadow = 'none';
         keyEl.style.color = '#999';
-    } else {
-        keyColors[code] = color;
-        applyKeyColor(keyEl, color);
+        keyEl.style.outline = '';
+        sendAllGroups();
+        return;
     }
-    // Send current locked state to hardware
-    if (livePreview) {
-        previewHW(buildFullHWState(null, null));
+    if (selectedKeys.has(code)) {
+        selectedKeys.delete(code);
+        keyEl.style.outline = '';
+    } else {
+        selectedKeys.add(code);
+        keyEl.style.outline = '2px solid var(--accent)';
     }
 }
 
@@ -1243,29 +1251,35 @@ function applyKeyColor(keyEl, hex) {
     }
 }
 
-function kbFill() {
-    const color = document.getElementById('paint-color').value;
+function selectAll() {
     document.querySelectorAll('.kb-key').forEach(k => {
         const code = parseInt(k.dataset.code);
-        keyColors[code] = color;
-        applyKeyColor(k, color);
+        selectedKeys.add(code);
+        k.style.outline = '2px solid var(--accent)';
     });
 }
 
-// Set paint color — only affects future clicks, not existing painted keys
+function clearSelection() {
+    selectedKeys.clear();
+    document.querySelectorAll('.kb-key').forEach(k => { k.style.outline = ''; });
+}
+
 function onPaintColorChange(newColor) {
     if (newColor) document.getElementById('paint-color').value = newColor;
 }
 
 function kbClear() {
+    // Clear everything: selection, applied groups, visuals, hardware
+    selectedKeys.clear();
+    appliedGroups = [];
     keyColors = {};
     document.querySelectorAll('.kb-key').forEach(k => {
         k.style.background = '#181818';
         k.style.borderColor = '#333';
         k.style.boxShadow = 'none';
         k.style.color = '#999';
+        k.style.outline = '';
     });
-    // Also clear hardware
     if (livePreview) previewHW({});
 }
 
@@ -1273,6 +1287,44 @@ function kbEraser() {
     eraserMode = !eraserMode;
     const btn = document.getElementById('eraser-btn');
     btn.classList.toggle('active', eraserMode);
+}
+
+// Apply color to selected keys as a static group
+function applyColorToSelection() {
+    if (selectedKeys.size === 0) { toast('Select some keys first', false); return; }
+    const color = document.getElementById('paint-color').value;
+    const codes = [...selectedKeys];
+
+    // Add as a static color group
+    appliedGroups.push({ effect: 'static', speed: 0, colors: [color], keys: codes });
+
+    // Visual feedback
+    codes.forEach(code => {
+        keyColors[code] = color;
+        const el = document.querySelector(`.kb-key[data-code="${code}"]`);
+        if (el) { applyKeyColor(el, color); el.style.outline = ''; }
+    });
+
+    // Clear selection
+    selectedKeys.clear();
+    sendAllGroups();
+    toast(`Applied color to ${codes.length} keys`);
+}
+
+// Send all applied groups to hardware
+async function sendAllGroups() {
+    if (appliedGroups.length === 0) return;
+    const groups = appliedGroups.map(g => ({
+        effect: g.effect, speed: g.speed, colors: g.colors,
+        keys: g.keys.map(c => '0x' + c.toString(16).padStart(4, '0')),
+    }));
+    try {
+        await fetch('/effect-keys', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({groups})
+        });
+    } catch(e) {}
 }
 
 // Gamer Presets
@@ -1418,6 +1470,9 @@ const GAMER_PRESETS = {
 function gamerPreset(name) {
     const p = GAMER_PRESETS[name];
     if (!p) return;
+    // Reset everything
+    selectedKeys.clear();
+    appliedGroups = [];
     keyColors = {};
 
     // Collect all key elements
@@ -1496,20 +1551,34 @@ function gamerPreset(name) {
         keyColors[LOGO_CODE] = p.logo;
         if (keyEls[LOGO_CODE]) applyKeyColor(keyEls[LOGO_CODE], p.logo);
     }
+
+    // Build applied groups from keyColors (group by color for efficiency)
+    const colorGroups = {};
+    for (const [code, color] of Object.entries(keyColors)) {
+        if (color === '#000000') continue;
+        if (!colorGroups[color]) colorGroups[color] = [];
+        colorGroups[color].push(parseInt(code));
+    }
+    for (const [color, codes] of Object.entries(colorGroups)) {
+        appliedGroups.push({ effect: 'static', speed: 0, colors: [color], keys: codes });
+    }
+    sendAllGroups();
+    // Clear selection outlines
+    document.querySelectorAll('.kb-key').forEach(k => { k.style.outline = ''; });
 }
 
 async function applyKeyboard() {
-    // Everything in ONE keys command — keyboard + perimeter + logo all at once
-    const args = [];
-    for (const [code, color] of Object.entries(keyColors)) {
-        if (color === '#000000') continue;
-        args.push(`0x${parseInt(code).toString(16).padStart(4,'0')}:${color}`);
+    // If there's an active selection, apply color to it first
+    if (selectedKeys.size > 0) {
+        applyColorToSelection();
     }
-    if (args.length === 0) {
-        toast('No keys colored — paint some keys first!', false);
+    // Send all applied groups to hardware
+    if (appliedGroups.length === 0) {
+        toast('Nothing to apply — select keys and assign colors/effects first', false);
         return;
     }
-    await api('keys ' + args.join(' '));
+    await sendAllGroups();
+    toast(`Applied ${appliedGroups.length} group(s) to hardware`);
     refreshStatus();
 }
 
@@ -1754,11 +1823,26 @@ let activeModifiers = new Set();
 function appPreset(name) {
     const p = APP_PRESETS[name];
     if (!p) return;
+    selectedKeys.clear();
+    appliedGroups = [];
     activeAppPreset = name;
     document.getElementById('modifier-hint').style.display = 'block';
 
     // Apply base layer
     applyAppLayer(p, 'base');
+
+    // Build groups and send to hardware
+    const colorGroups = {};
+    for (const [code, color] of Object.entries(keyColors)) {
+        if (color === '#000000') continue;
+        if (!colorGroups[color]) colorGroups[color] = [];
+        colorGroups[color].push(parseInt(code));
+    }
+    for (const [color, codes] of Object.entries(colorGroups)) {
+        appliedGroups.push({ effect: 'static', speed: 0, colors: [color], keys: codes });
+    }
+    sendAllGroups();
+    document.querySelectorAll('.kb-key').forEach(k => { k.style.outline = ''; });
 }
 
 function applyAppLayer(p, layer) {
@@ -1846,27 +1930,19 @@ document.addEventListener('keyup', (e) => {
 });
 
 // =========================================================================
-// Effect Modes — hardware-animated per-key effects via multi command
+// Effect system — select keys → apply color or effect → clear selection → repeat
 // =========================================================================
-// Effect group system: paint keys → assign effect → paint more → assign different effect
-// All groups sent together in one HID command
-let effectGroups = []; // [{effect, speed, colors, keys, paintColor}]
-
 const EFFECT_MAP = {
     'type-glow': 'type',
     'breathe':   'color-pulse',
     'wave':      'color-wave',
     'rain':      'rain',
-    'ripple':    'ripple',
 };
-
-// Effect config: which controls each effect needs
 const EFFECT_CFG = {
     'type-glow': { colors: 1, speed: true },
     'breathe':   { colors: 2, speed: true },
     'wave':      { colors: 2, speed: true },
     'rain':      { colors: 1, speed: true },
-    'ripple':    { colors: 1, speed: true },
 };
 
 let selectedEffect = null;
@@ -1874,132 +1950,49 @@ let selectedEffect = null;
 function selectEffect(mode) {
     selectedEffect = mode;
     const cfg = EFFECT_CFG[mode] || { colors: 1, speed: true };
-    // Highlight selected button
     document.querySelectorAll('[id^="eb-"]').forEach(b => b.classList.remove('active'));
     const btn = document.getElementById('eb-' + mode);
     if (btn) btn.classList.add('active');
-    // Show controls
     const panel = document.getElementById('effect-controls');
     panel.style.display = 'block';
     document.getElementById('ec-1color').style.display = cfg.colors === 1 ? '' : 'none';
     document.getElementById('ec-2color').style.display = cfg.colors === 2 ? '' : 'none';
     document.getElementById('ec-speed').style.display = cfg.speed ? 'flex' : 'none';
-    // Apply immediately
-    effectMode(mode);
 }
 
 document.getElementById('fx-speed').addEventListener('input', function() {
     document.getElementById('fx-speed-val').textContent = this.value;
 });
 
-// When effect color pickers change, update the painted keys' visual color
-function onFxColorChange() {
+// Apply effect to current selection
+function applyEffectToSelection() {
+    if (selectedKeys.size === 0) { toast('Select some keys first', false); return; }
+    if (!selectedEffect) { toast('Pick an effect first', false); return; }
+    const ename = EFFECT_MAP[selectedEffect] || 'static';
     const cfg = EFFECT_CFG[selectedEffect] || { colors: 1 };
-    const color = cfg.colors === 2
-        ? document.getElementById('fx-color2a').value
-        : document.getElementById('fx-color1').value;
-    // Update all currently painted keys to this color
-    for (const [code, oldColor] of Object.entries(keyColors)) {
-        if (oldColor === '#000000') continue;
-        keyColors[code] = color;
-        const el = document.querySelector(`.kb-key[data-code="${code}"]`);
-        if (el) applyKeyColor(el, color);
-    }
-    // Also preview on hardware
-    if (livePreview) previewHW(buildFullHWState(null, null));
-}
-['input','change'].forEach(evt => {
-    document.getElementById('fx-color1').addEventListener(evt, onFxColorChange);
-    document.getElementById('fx-color2a').addEventListener(evt, onFxColorChange);
-});
-
-async function applySelectedEffect() {
-    if (!selectedEffect) { toast('Select an effect first', false); return; }
-    effectMode(selectedEffect);
-}
-
-async function effectMode(mode) {
-    activeAppPreset = null;
-    document.getElementById('modifier-hint').style.display = 'none';
-    const ename = EFFECT_MAP[mode] || 'static';
-    const cfg = EFFECT_CFG[mode] || { colors: 1 };
     const speed = parseInt(document.getElementById('fx-speed').value) || 2;
-
-    // Get colors from the contextual pickers
     let colors;
     if (cfg.colors === 2) {
-        colors = [
-            document.getElementById('fx-color2a').value,
-            document.getElementById('fx-color2b').value,
-        ];
+        colors = [document.getElementById('fx-color2a').value, document.getElementById('fx-color2b').value];
     } else {
         colors = [document.getElementById('fx-color1').value];
     }
+    const codes = [...selectedKeys];
 
-    // Collect currently painted keys not yet in a group
-    const usedCodes = new Set();
-    effectGroups.forEach(g => g.keys.forEach(k => usedCodes.add(k)));
+    appliedGroups.push({ effect: ename, speed, colors, keys: codes });
 
-    const allKC = Object.keys(keyColors);
-    const nonBlack = allKC.filter(c => keyColors[c] !== '#000000');
-    let newCodes = nonBlack
-        .filter(c => !usedCodes.has('0x'+parseInt(c).toString(16).padStart(4,'0')))
-        .map(c => '0x'+parseInt(c).toString(16).padStart(4,'0'));
-
-    if (newCodes.length === 0 && effectGroups.length === 0) {
-        // Nothing painted AND no groups — apply to all keys
-        document.querySelectorAll('.kb-key').forEach(el => {
-            newCodes.push('0x'+parseInt(el.dataset.code).toString(16).padStart(4,'0'));
-        });
-    } else if (newCodes.length === 0) {
-        // No new keys but groups exist — just re-send existing groups
-    }
-
-    if (newCodes.length > 0) {
-        effectGroups.push({
-            effect: ename,
-            speed: speed,
-            colors: colors,
-            keys: newCodes,
-        });
-
-        // Mark keys with outline in first color
-        newCodes.forEach(codeStr => {
-            const code = parseInt(codeStr, 16);
-            const el = document.querySelector(`.kb-key[data-code="${code}"]`);
-            if (el) el.style.outline = '2px solid ' + colors[0];
-        });
-
-        // Clear from keyColors so next paint is a fresh group
-        newCodes.forEach(codeStr => { delete keyColors[parseInt(codeStr, 16)]; });
-    }
-
-    // Send ALL groups at once
-    const groups = effectGroups.map(g => ({
-        effect: g.effect,
-        speed: g.speed,
-        colors: g.colors,
-        keys: g.keys,
-    }));
-
-    try {
-        const r = await fetch('/effect-keys', {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({groups})
-        });
-        const d = await r.json();
-        const totalKeys = groups.reduce((sum, g) => sum + g.keys.length, 0);
-        if (d.ok) toast(`${effectGroups.length} group(s), ${totalKeys} keys total`);
-        else toast('Effect error: ' + (d.err||''), false);
-    } catch(e) { toast('Error', false); }
+    // Visual: color the keys and clear selection outline
+    codes.forEach(code => {
+        keyColors[code] = colors[0];
+        const el = document.querySelector(`.kb-key[data-code="${code}"]`);
+        if (el) { applyKeyColor(el, colors[0]); el.style.outline = ''; }
+    });
+    selectedKeys.clear();
+    sendAllGroups();
+    toast(`${ename} on ${codes.length} keys`);
 }
 
-function clearEffectGroups() {
-    effectGroups = [];
-    document.querySelectorAll('.kb-key').forEach(el => { el.style.outline = ''; });
-    toast('Effect groups cleared');
-}
+async function applySelectedEffect() { applyEffectToSelection(); }
 
 // =========================================================================
 // Key Calibration Tool — lights up one keycode at a time to identify mapping
