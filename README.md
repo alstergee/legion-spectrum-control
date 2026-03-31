@@ -20,6 +20,8 @@ Every other Linux RGB tool for Legion laptops tops out at 4-zone control. The Ge
 - **Web UI** with hardware monitoring (fan speeds, temps, platform profile)
 - **No dependencies** — stdlib only (Python 3.6+, `fcntl`, `struct`, `http.server`)
 
+![Legion Spectrum Control Web UI](screenshot.png)
+
 ## Quick Demo
 
 ```bash
